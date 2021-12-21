@@ -27,7 +27,7 @@ journalctl --vacuum-time=3d
 echo "|||Clean the thumbnail cache|||"
 rm -rf ~/.cache/thumbnails/*
 #
-echo "|||Free up space by clean out the cached packages|||"
+echo "|||Free up space by cleanning out the cached packages|||"
 apt-get autoclean -y # remove only the outdated packages, like those superseded by a recent update
 apt-get clean -y #  delete apt cache in its entirety -frees more disk space-
 echo "|||Getting rid of partial packages|||"
