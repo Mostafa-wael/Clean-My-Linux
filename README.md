@@ -12,7 +12,7 @@ Check the storage before and after!
 
 The script does the following: 
 - Clean all the log file.
-- Clear systemd journal logs.
+- Clean systemd journal logs.
 - Clean the thumbnail cache.
 - Free up space by cleanning out the cached packages.
 - Getting rid of partial packages.
