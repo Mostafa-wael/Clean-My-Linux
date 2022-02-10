@@ -7,77 +7,77 @@ echo "\033[33mFilesystem      Size  Used Avail Use% Mounted on\033[0m"
 df -h  | grep /$ 
 # du -Sh | sort -rh | head -n 10 # get the largest 10 direcotories
 # df -h  | sort --key 5 -rh # sort according to the 5th column
-echo "\033[32m|||Show Storage of The Snaps\033[0m|||"
+echo "\033[32m|||Show Storage of The Snaps|||\033[0m"
 df -h  | grep /snap | sort --key 3 -rh
 #
 #
-echo "\033[32m|||Check the Drive Space Used by Cached Files\033[0m|||"
+echo "\033[32m|||Check the Drive Space Used by Cached Files|||\033[0m"
 du -sh /var/cache/apt
 #
-echo "\033[32m|||Clean all the log file\033[0m|||"
+echo "\033[32m|||Clean all the log file|||\033[0m"
 logs=`find /var/log -type f`
 for i in $logs
 do
 > $i
 done
 #
-echo "\033[32m|||Clear systemd journal logs\033[0m|||"
+echo "\033[32m|||Clear systemd journal logs|||\033[0m"
 journalctl --vacuum-time=3d
 #
-echo "\033[32m|||Clean the thumbnail cache\033[0m|||"
+echo "\033[32m|||Clean the thumbnail cache|||\033[0m"
 rm -rf ~/.cache/thumbnails/*
 #
-echo "\033[32m|||Free up space by cleanning out the cached packages\033[0m|||"
+echo "\033[32m|||Free up space by cleanning out the cached packages\|||033[0m"
 apt-get autoclean -y # remove only the outdated packages, like those superseded by a recent update
 apt-get clean -y #  delete apt cache in its entirety -frees more disk space-
-echo "\033[32m|||Getting rid of partial packages\033[0m|||"
+echo "\033[32m|||Getting rid of partial packages|||\033[0m"
 apt-get remove --purge -y software-properties-common -y
 #
-echo "\033[32m|||Getting rid of no longer required packages\033[0m|||"
+echo "\033[32m|||Getting rid of no longer required packages|||\033[0m"
 apt-get autoremove -y
 #
-echo "\033[32m|||Remove Any Automatic Dependencies that are No Longer Needed" echo "with all of the associated configuration files from the dependencies\033[0m|||"
+echo "\033[32m|||Remove Any Automatic Dependencies that are No Longer Needed" echo "with all of the associated configuration files from the dependencies|||\033[0m"
 apt-get --purge autoremove -y
 #
-echo "\033[32m|||Getting rid of orphaned packages\033[0m|||"
+echo "\033[32m|||Getting rid of orphaned packages|||\033[0m"
 deborphan | xargs sudo apt-get -y remove --purge
 #
 #
-echo "\033[32m|||Remove the Trash\033[0m|||"
+echo "\033[32m|||Remove the Trash|||\033[0m"
 rm -rf /home/*/.local/share/Trash/*/**
 rm -rf /root/.local/share/Trash/*/**
 #
-echo "\033[32m|||Remove Man\033[0m|||"
+echo "\033[32m|||Remove Man|||\033[0m"
 rm -rf /usr/share/man/?? 
 rm -rf /usr/share/man/??_*
 #
-echo "\033[32m|||Delete all .gz and rotated file\033[0m|||"
+echo "\033[32m|||Delete all .gz and rotated file|||\033[0m"
 find /var/log -type f -regex ".*\.gz$" | xargs rm -Rf
 find /var/log -type f -regex ".*\.[0-9]$" | xargs rm -Rf
 #
-echo "\033[32m|||Cleaning the old kernels\033[0m|||"
+echo "\033[32m|||Cleaning the old kernels|||\033[0m"
 dpkg-query -l|grep linux-im*
 apt-get purge $(dpkg -l 'linux-*' | sed '/^ii/!d;/'"$(uname -r | sed "s/\(.*\)-\([^0-9]\+\)/\1/")"'/d;s/^[^ ]* [^ ]* \([^ ]*\).*/\1/;/[0-9]/!d' | head -n -1) --assume-yes
 apt-get install linux-headers-`uname -r|cut -d'-' -f3`-`uname -r|cut -d'-' -f4`
 #
 #
-echo "\033[32m|||Removes old revisions of snaps\033[0m|||"
+echo "\033[32m|||Removes old revisions of snaps|||\033[0m"
 du -h /var/lib/snapd/snaps
-echo "\033[32m|||CLOSE ALL SNAPS BEFORE RUNNING THIS\033[0m|||"
+echo "\033[32m|||CLOSE ALL SNAPS BEFORE RUNNING THIS|||\033[0m"
 set -eu
 #
-echo "\033[32m|||Retain only two old revisions of snaps\033[0m|||" # starting from snap v2.34
+echo "\033[32m|||Retain only two old revisions of snaps|||\033[0m" # starting from snap v2.34
 sudo snap set system refresh.retain=2 
 
 #
 #
-echo "\033[32m|||Show Storage of The Root\033[0m|||"
+echo "\033[32m|||Show Storage of The Root|||\033[0m"
 echo "\033[33mFilesystem      Size  Used Avail Use% Mounted on\033[0m"
 df -h  | grep /$ 
-echo "\033[32m|||Show Storage of The Snaps\033[0m|||"
+echo "\033[32m|||Show Storage of The Snaps|||\033[0m"
 df -h  | grep /snap | sort --key 3 -rh
 #
 #
 #Cleaning is completed
-echo "\033[32m|||Cleaning is completed\033[0m|||"
+echo "\033[32m|||Cleaning is completed|||\033[0m"
 ###
