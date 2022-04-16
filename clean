@@ -3,8 +3,9 @@
 # sudo ./clean
 
 echo "\033[32m|||Show Storage of The Root|||\033[0m"
-echo "\033[33mFilesystem      Size  Used Avail Use% Mounted on\033[0m"
-df -h  | grep /$ 
+echo "\033[33mFilesystem     Size  Used Avail Use% Mounted on\033[0m"
+oldMem=$(df -h  | grep /$)
+echo $oldMem
 # du -Sh | sort -rh | head -n 10 # get the largest 10 direcotories
 # df -h  | sort --key 5 -rh # sort according to the 5th column
 echo "\033[32m|||Show Storage of The Snaps|||\033[0m"
@@ -71,11 +72,13 @@ sudo snap set system refresh.retain=2
 
 #
 #
-echo "\033[32m|||Show Storage of The Root|||\033[0m"
-echo "\033[33mFilesystem      Size  Used Avail Use% Mounted on\033[0m"
-df -h  | grep /$ 
 echo "\033[32m|||Show Storage of The Snaps|||\033[0m"
 df -h  | grep /snap | sort --key 3 -rh
+echo "\033[32m|||Show Storage of the Root Before & After Cleanning|||\033[0m"
+echo "	\033[33mFilesystem     	 Size  Used Avail Use% Mounted on\033[0m"
+newMem=$(df -h  | grep /$)
+echo "Before: $oldMem"
+echo "After:  $newMem"
 #
 #
 #Cleaning is completed
