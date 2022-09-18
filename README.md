@@ -3,14 +3,16 @@ A script to clean-up your Linux work enviroment.
 
 1. Clone the repo.
 2. Add the script into your Home.
-3. Run `sudo ./clean`
+3. Give the script the required permissions: `chmod u+x clean`
+4. Add it to your binaries: `sudo cp ./clean /usr/local/bin`
+3. Finally, run: `sudo clean`
 
 Check the storage before and after!
 
 ![Script](https://user-images.githubusercontent.com/56788883/146991100-f4741c68-3769-42bc-9542-bc72a312b603.png)
 
 
-The script do the following: 
+The script does the following: 
 - Clean all the log files.
 - Clean systemd journal logs.
 - Clean the thumbnail cache.
