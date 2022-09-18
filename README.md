@@ -2,10 +2,13 @@
 A script to clean-up your Linux work enviroment.
 
 1. Clone the repo.
-2. Add the script into your Home.
-3. Give the script the required permissions: `chmod u+x clean`
-4. Add it to your binaries: `sudo cp ./clean /usr/local/bin`
-3. Finally, run: `sudo clean`
+2. If you used the download options:
+  - Go to the downloads: `cd ~/Downloads/`
+  - Unzip the file: `unzip Clean-My-Linux-main.zip`
+3. Go to the script: `cd Clean-My-Linux-main`
+4. Give the script the required permissions: `chmod u+x clean`
+5. Add it to your binaries: `sudo cp ./clean /usr/local/bin`
+6. Finally, run: `sudo clean`
 
 Check the storage before and after!
 
