@@ -8,7 +8,8 @@ A script to clean-up your Linux work enviroment.
 3. Go to the script: `cd Clean-My-Linux-main`
 4. Give the script the required permissions: `chmod u+x clean`
 5. Add it to your binaries: `sudo cp ./clean /usr/local/bin`
-6. Finally, run: `sudo clean`
+6. To solve some permission issues: `sudo chown -R $(whoami) /usr/local/bin/clean`
+7. Finally, run: `sudo clean`
 
 Check the storage before and after!
 
