@@ -1,97 +1,256 @@
-#!/bin/sh
-
-# sudo ./clean
-
-echo ""
-echo "                              _____ _                   ___  ___        _     _                   "
-echo "                             /  __ \ |                  |  \/  |       | |   (_)                  "
-echo "                             | /  \/ | ___  ____ _ __   | .  . |_   _  | |    _ _ __  _   ___  __ "
-echo "                             | |   | |/ _ \/ _  | '_ \  | |\/| | | | | | |   | | '_ \| | | \ \/ / "
-echo "                             | \__/\ |  __/ (_| | | | | | |  | | |_| | | |___| | | | | |_| |>  <  "
-echo "                              \____/_|\___|\__,_|_| |_| \_|  |_/\__, | \_____/_|_| |_|\__,_/_/\_\ "
-echo "                                                                 __/ |                            "
-echo "                                                                |___/                             "
-echo ""
-
-echo "\033[32m|||Show Storage of The Root|||\033[0m"
-echo "\033[33mFilesystem     Size  Used Avail Use% Mounted on\033[0m"
-oldMem=$(df -h  | grep /$)
-echo $oldMem
-# du -Sh | sort -rh | head -n 10 # get the largest 10 direcotories
-# df -h  | sort --key 5 -rh # sort according to the 5th column
-echo "\033[32m|||Show Storage of The Snaps|||\033[0m"
-df -h  | grep /snap | sort --key 3 -rh
+#!/usr/bin/env bash
+# clean: free up disk space on an Ubuntu dev machine.
+#   `sudo clean` cleans every user under /home plus the system.
+#   `clean` cleans only your user, and asks for sudo for the system part.
 #
+# Usage:
+#   clean              # caches, old app versions, apt/journal/snap leftovers
+#   clean --deep       # also: Go module cache, pre-commit envs, Cursor DB vacuum (close Cursor first)
+#   clean --dry-run    # show what would be freed, change nothing
+#   clean --status     # report only: disk, memory, pressure
 #
-echo "\033[32m|||Check the Drive Space Used by Cached Files|||\033[0m"
-du -sh /var/cache/apt
-#
-echo "\033[32m|||Clean all the log file|||\033[0m"
-logs=`find /var/log -type f`
-for i in $logs
-do
-> $i
+# Things this script deliberately does NOT do (older versions did, they break stuff):
+# removing software-properties-common, deleting /usr/share/man/??, deborphan removals,
+# truncating live /var/log files, `docker system prune --volumes`.
+
+set -uo pipefail
+
+if [ "$(id -u)" = 0 ]; then
+  SUDO=""; HOMES=(/home/*)
+else
+  SUDO="sudo"; HOMES=("$HOME")
+fi
+
+DRY=0; DEEP=0; STATUS_ONLY=0
+for a in "$@"; do
+  case "$a" in
+    --dry-run|-n) DRY=1 ;;
+    --deep)       DEEP=1 ;;
+    --status|-s)  STATUS_ONLY=1 ;;
+    --help|-h)    sed -n '2,8p' "$0"; exit 0 ;;
+    *) echo "unknown flag: $a (try --help)"; exit 1 ;;
+  esac
 done
-#
-echo "\033[32m|||Clear systemd journal logs|||\033[0m"
-journalctl --vacuum-time=3d
-#
-echo "\033[32m|||Clean the thumbnail cache|||\033[0m"
-rm -rf ~/.cache/thumbnails/*
-#
-echo "\033[32m|||Free up space by cleanning out the cached packages\|||033[0m"
-apt-get autoclean -y # remove only the outdated packages, like those superseded by a recent update
-apt-get clean -y #  delete apt cache in its entirety -frees more disk space-
-echo "\033[32m|||Getting rid of partial packages|||\033[0m"
-apt-get remove --purge -y software-properties-common -y
-#
-echo "\033[32m|||Getting rid of no longer required packages|||\033[0m"
-apt-get autoremove -y
-#
-echo "\033[32m|||Remove Any Automatic Dependencies that are No Longer Needed" echo "with all of the associated configuration files from the dependencies|||\033[0m"
-apt-get --purge autoremove -y
-#
-echo "\033[32m|||Getting rid of orphaned packages|||\033[0m"
-deborphan | xargs sudo apt-get -y remove --purge
-#
-#
-echo "\033[32m|||Remove the Trash|||\033[0m"
-rm -rf /home/*/.local/share/Trash/*/**
-rm -rf /root/.local/share/Trash/*/**
-#
-echo "\033[32m|||Remove Man|||\033[0m"
-rm -rf /usr/share/man/?? 
-rm -rf /usr/share/man/??_*
-#
-echo "\033[32m|||Delete all .gz and rotated file|||\033[0m"
-find /var/log -type f -regex ".*\.gz$" | xargs rm -Rf
-find /var/log -type f -regex ".*\.[0-9]$" | xargs rm -Rf
-#
-echo "\033[32m|||Cleaning the old kernels|||\033[0m"
-dpkg-query -l|grep linux-im*
-apt-get purge $(dpkg -l 'linux-*' | sed '/^ii/!d;/'"$(uname -r | sed "s/\(.*\)-\([^0-9]\+\)/\1/")"'/d;s/^[^ ]* [^ ]* \([^ ]*\).*/\1/;/[0-9]/!d' | head -n -1) --assume-yes
-apt-get install linux-headers-`uname -r|cut -d'-' -f3`-`uname -r|cut -d'-' -f4`
-#
-#
-echo "\033[32m|||Removes old revisions of snaps|||\033[0m"
-du -h /var/lib/snapd/snaps
-echo "\033[32m|||CLOSE ALL SNAPS BEFORE RUNNING THIS|||\033[0m"
-set -eu
-#
-echo "\033[32m|||Retain only two old revisions of snaps|||\033[0m" # starting from snap v2.34
-sudo snap set system refresh.retain=2 
 
-#
-#
-echo "\033[32m|||Show Storage of The Snaps|||\033[0m"
-df -h  | grep /snap | sort --key 3 -rh
-echo "\033[32m|||Show Storage of the Root Before & After Cleanning|||\033[0m"
-echo "	\033[33mFilesystem     	 Size  Used Avail Use% Mounted on\033[0m"
-newMem=$(df -h  | grep /$)
-echo "Before: $oldMem"
-echo "After:  $newMem"
-#
-#
-#Cleaning is completed
-echo "\033[32m|||Cleaning is completed|||\033[0m"
-###
+G='\033[32m'; Y='\033[33m'; D='\033[2m'; N='\033[0m'
+say()  { printf "${G}==>${N} %s\n" "$*"; }
+warn() { printf "${Y}  ! ${N}%s\n" "$*"; }
+skip() { printf "${D}  - %s${N}\n" "$*"; }
+
+avail_kb() { df --output=avail / | tail -1; }
+mb() { echo $(( ${1:-0} / 1024 )); }
+running() { pgrep -u "$U" -x "$1" >/dev/null 2>&1; }
+as_user() { if [ "$(id -u)" = 0 ]; then sudo -u "$U" -H "$@"; else "$@"; fi; }
+
+# rm a path, reporting its size. Honors --dry-run.
+drop() {
+  local path="$1" label="${2:-${1#/home/}}" sz
+  [ -e "$path" ] || return 0
+  sz=$(du -sm "$path" 2>/dev/null | cut -f1)
+  [ "${sz:-0}" -gt 0 ] || return 0
+  if [ "$DRY" = 1 ]; then
+    printf "  would free %6s MB  %s\n" "$sz" "$label"
+  else
+    rm -rf "$path" 2>/dev/null && printf "  freed      %6s MB  %s\n" "$sz" "$label"
+  fi
+}
+
+# ---------------------------------------------------------------- status
+status_report() {
+  say "Disk"
+  df -h / | tail -1 | awk '{printf "  root: %s used of %s (%s), %s free\n", $3,$2,$5,$4}'
+  say "Memory"
+  free -h | awk '/^Mem:/{printf "  ram:  %s used of %s, %s available\n",$3,$2,$7}
+                 /^Swap:/{printf "  swap: %s used of %s\n",$3,$2}'
+  if command -v zramctl >/dev/null; then
+    zramctl --noheadings --output NAME,DISKSIZE,DATA,TOTAL 2>/dev/null |
+      awk '{printf "  zram: %s of %s used (costs %s real RAM)\n",$3,$2,$4}'
+  fi
+  say "Pressure (avg60, how often tasks stalled)"
+  for r in cpu memory io; do
+    awk -v r="$r" '/^some/{for(i=1;i<=NF;i++) if($i ~ /^avg60=/){split($i,a,"=");
+      printf "  %-7s %5.1f%%%s\n", r, a[2], (a[2]>10 ? "   <-- bottleneck" : "")}}' \
+      /proc/pressure/$r 2>/dev/null
+  done
+  say "Top memory consumers"
+  ps -eo rss,comm --no-headers --sort=-rss | awk '
+    {agg[$2]+=$1} END {for(c in agg) printf "%10.0f MB  %s\n", agg[c]/1024, c}' |
+    sort -rn | head -6
+}
+
+[ "$STATUS_ONLY" = 1 ] && { status_report; exit 0; }
+
+BEFORE=$(avail_kb)
+[ "$DRY" = 1 ] && warn "DRY RUN, nothing will be deleted"
+status_report
+echo
+
+for HOME in "${HOMES[@]}"; do
+[ -d "$HOME" ] || continue
+U=$(stat -c %U "$HOME")
+id "$U" >/dev/null 2>&1 || continue
+# ------------------------------------------------------- tier 1: user caches
+say "[$U] User caches (regenerate on demand)"
+# Browser HTTP/JS caches: safe live, fully released on browser restart.
+for br in google-chrome chromium BraveSoftware/Brave-Browser; do
+  [ -d "$HOME/.cache/$br" ] || continue
+  while read -r d; do
+    drop "$d"
+  done < <(find "$HOME/.cache/$br" -maxdepth 3 -type d \
+    \( -name Cache -o -name "Code Cache" -o -name GPUCache \
+       -o -name DawnGraphiteCache -o -name DawnWebGPUCache \) -prune 2>/dev/null)
+done
+# Rebuildable tool caches. NOT ~/.cache/aws (SSO tokens, forces re-login).
+for c in uv pip typescript go-build goimports gopls node helm gitdirs chrome-devtools-mcp \
+         puppeteer ms-playwright thumbnails yarn mesa_shader_cache mesa_shader_cache_db \
+         claude-cli-nodejs; do
+  drop "$HOME/.cache/$c"
+done
+drop "$HOME/.npm/_cacache"
+drop "$HOME/.npm/_npx"   # npx package cache, refetched on next npx run
+for c in Cache CachedData GPUCache "Code Cache"; do
+  drop "$HOME/.config/Cursor/$c"; drop "$HOME/.config/Code/$c"
+done
+pnpm=$(PATH="$HOME/.local/share/pnpm:$PATH" command -v pnpm)
+if [ "$DRY" = 0 ] && [ -n "$pnpm" ]; then
+  as_user "$pnpm" store prune >/dev/null 2>&1 && skip "pnpm store pruned"
+fi
+drop "$HOME/.local/share/Trash/files" "Trash"
+[ "$DRY" = 1 ] || rm -rf "$HOME/.local/share/Trash/info/"* 2>/dev/null
+
+# ------------------------------------- tier 1b: stale app versions/leftovers
+say "[$U] Stale app versions"
+# claude / cursor-agent: keep only the version ~/.local/bin points at.
+for bin in claude cursor-agent; do
+  dir="$HOME/.local/share/$bin/versions"
+  [ -d "$dir" ] || continue
+  cur=$(readlink -f "$HOME/.local/bin/$bin" 2>/dev/null) || continue
+  case "$cur" in "$dir"/*) ;; *) continue ;; esac
+  keep=${cur#"$dir"/}; keep=${keep%%/*}
+  for v in "$dir"/*; do [ "${v##*/}" = "$keep" ] || drop "$v"; done
+done
+# Extension folders not in extensions.json (old versions the editor left behind).
+for ext in "$HOME/.vscode/extensions" "$HOME/.cursor/extensions"; do
+  [ -f "$ext/extensions.json" ] || continue
+  while read -r d; do drop "$ext/$d"; done < <(python3 -I - "$ext" <<'EOF'
+import json, os, sys
+d = sys.argv[1]
+try:
+    used = {e.get("relativeLocation") for e in json.load(open(os.path.join(d, "extensions.json")))}
+except Exception:
+    sys.exit(0)
+used.discard(None)
+if not used:
+    sys.exit(0)
+for n in sorted(os.listdir(d)):
+    if os.path.isdir(os.path.join(d, n)) and not n.startswith(".") and n not in used:
+        print(n)
+EOF
+)
+done
+# Backups AppImageUpdate leaves next to updated AppImages.
+for f in "$HOME"/Applications/*.zs-old "$HOME"/Applications/*.AppImage.old; do
+  [ -e "$f" ] && drop "$f"
+done
+# ------------------------------------------------------------ tier 4: --deep
+if [ "$DEEP" = 1 ]; then
+  say "[$U] Deep: slow-to-rebuild caches"
+  if go=$(PATH="/snap/bin:/usr/local/go/bin:$PATH" command -v go) && [ -d "$HOME/go/pkg/mod" ]; then
+    if [ "$DRY" = 1 ]; then drop "$HOME/go/pkg/mod"
+    else sz=$(du -sm "$HOME/go/pkg/mod" | cut -f1); as_user "$go" clean -modcache && printf "  freed      %6s MB  go/pkg/mod\n" "$sz"; fi
+  fi
+  drop "$HOME/.cache/pre-commit"   # hook envs, rebuilt on next commit (slow once)
+
+  say "[$U] Deep: Cursor/VSCode state database"
+  for db in "$HOME/.config/Cursor/User/globalStorage/state.vscdb" \
+            "$HOME/.config/Code/User/globalStorage/state.vscdb"; do
+    [ -f "$db" ] || continue
+    app=$(basename "$(dirname "$(dirname "$(dirname "$db")")")")
+    # Editing this DB live corrupts chat history: the editor holds it open in WAL mode.
+    if running "$app" || running "${app,,}" || running code; then
+      warn "$app is running, close it and rerun. Skipping (would risk chat-history corruption)."
+      continue
+    fi
+    sz=$(du -sm "$db" | cut -f1)
+    free_mb=$(mb "$(avail_kb)")
+    if [ "$free_mb" -lt $((sz * 2)) ]; then
+      warn "need $((sz * 2))MB free to back up + VACUUM (have ${free_mb}MB). Free space first."
+      continue
+    fi
+    echo "  $app db: ${sz} MB"
+    if [ "$DRY" = 1 ]; then
+      as_user sqlite3 "$db" "SELECT '  would drop agent blob cache: '||COUNT(*)||' rows, '||(IFNULL(SUM(length(value)),0)/1024/1024)||' MB' FROM cursorDiskKV WHERE key LIKE 'agentKv:blob:%';" 2>/dev/null
+    else
+      as_user cp "$db" "$db.bak" || { warn "backup failed, skipping"; continue; }
+      # agentKv blobs are a content-addressed cache, regenerated on demand.
+      # bubbleId rows are chat history, deliberately NOT touched.
+      if as_user sqlite3 "$db" "DELETE FROM cursorDiskKV WHERE key LIKE 'agentKv:blob:%'; VACUUM;" 2>/dev/null \
+         && [ "$(as_user sqlite3 "$db" 'PRAGMA quick_check;' 2>/dev/null)" = ok ]; then
+        rm -f "$db.bak"
+        printf "  shrunk to %s MB (integrity ok, backup removed)\n" "$(du -sm "$db" | cut -f1)"
+      else
+        as_user mv -f "$db.bak" "$db"; warn "vacuum or integrity check failed; original restored"
+      fi
+    fi
+  done
+else
+  skip "[$U] go mod cache, pre-commit, Cursor DB untouched (use --deep, with Cursor closed)"
+fi
+
+done
+unset U; HOME=$(getent passwd "$(id -un)" | cut -d: -f6)
+
+# ------------------------------------------------------------- tier 2: docker
+if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
+  say "Docker (images + build cache; volumes kept, they hold data)"
+  if [ "$DRY" = 1 ]; then
+    docker system df 2>/dev/null | awk 'NR>1{printf "  reclaimable: %s  (%s)\n",$NF,$1}'
+  else
+    docker system prune -af 2>/dev/null | tail -1 | sed 's/^/  /'
+    docker builder prune -af 2>/dev/null | tail -1 | sed 's/^/  /'
+  fi
+fi
+
+# ------------------------------------------------------------- tier 3: system
+if [ "$DRY" = 1 ]; then
+  say "System (sudo)"
+  printf "  apt cache: %s\n" "$(du -sh /var/cache/apt 2>/dev/null | cut -f1)"
+  printf "  autoremovable packages: %s\n" "$(apt-get -s autoremove 2>/dev/null | grep -c '^Remv')"
+  printf "  removed-package config leftovers (rc): %s\n" "$(dpkg -l | grep -c '^rc')"
+  printf "  disabled snap revisions: %s\n" "$(snap list --all 2>/dev/null | grep -c disabled)"
+  journalctl --disk-usage 2>/dev/null | sed 's/^/  /'
+else
+  say "System (needs sudo)"
+  [ -z "$SUDO" ] || sudo -v 2>/dev/null || warn "no sudo; skipping system tier"
+  if [ -z "$SUDO" ] || sudo -n true 2>/dev/null; then
+    $SUDO apt-get autoclean -y  >/dev/null 2>&1 && skip "apt autoclean"
+    $SUDO apt-get clean -y      >/dev/null 2>&1 && skip "apt cache cleared"
+    $SUDO apt-get autoremove --purge -y >/dev/null 2>&1 && skip "unused packages removed"
+    # Config files of packages that are already removed. Never touches installed packages.
+    rc=$(dpkg -l | awk '/^rc/{print $2}')
+    [ -n "$rc" ] && echo "$rc" | xargs $SUDO dpkg --purge >/dev/null 2>&1 \
+      && skip "purged $(echo "$rc" | wc -l) removed-package config leftovers"
+    $SUDO journalctl --vacuum-time=7d 2>&1 | tail -1 | sed 's/^/  /'
+    # Rotated/compressed logs only. Never truncate live logs, it breaks running daemons.
+    $SUDO find /var/log -type f \( -name "*.gz" -o -name "*.[0-9]" -o -name "*.old" \) \
+      -delete 2>/dev/null && skip "rotated logs removed"
+
+    # Delete disabled snap revisions. `refresh.retain` alone never frees existing ones.
+    if command -v snap >/dev/null; then
+      $SUDO snap set system refresh.retain=2 2>/dev/null
+      n=0
+      while read -r name rev; do
+        [ -n "$name" ] || continue
+        $SUDO snap remove "$name" --revision="$rev" >/dev/null 2>&1 && n=$((n+1))
+      done < <(snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}')
+      [ "$n" -gt 0 ] && skip "removed $n disabled snap revisions"
+    fi
+  fi
+fi
+
+# ---------------------------------------------------------------- summary
+echo
+AFTER=$(avail_kb)
+say "Result"
+printf "  freed this run: %s MB\n" "$(mb $((AFTER - BEFORE)))"
+df -h / | tail -1 | awk '{printf "  root now: %s used of %s (%s), %s free\n",$3,$2,$5,$4}'

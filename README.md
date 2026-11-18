@@ -1,32 +1,60 @@
 # Clean-My-Linux
-A script to clean-up your Linux work enviroment.
 
-1. Clone the repo: `git clone https://github.com/Mostafa-wael/Clean-My-Linux.git`
-2. Go to the script: `cd Clean-My-Linux/`
-3. Give the script the required permissions: `chmod u+x clean`
-4. Add it to your binaries: `sudo cp ./clean /usr/local/bin`
-5. To solve some permission issues: `sudo chown -R $(whoami) /usr/local/bin/clean`
-6. Finally, run: `sudo clean`
+The script I run when my Ubuntu laptop starts running out of space. It deletes caches that rebuild themselves, old app and package versions, and stale logs, then tells you how much it got back.
 
-Check the storage before and after!
+I rewrote it in 2026. The first version emptied every log file, deleted man pages and ran `deborphan` to remove "orphan" packages. That last one quietly uninstalled things I still needed (CPU microcode, for one). The new version sticks to stuff that's safe to lose.
 
-![Script](https://user-images.githubusercontent.com/56788883/146991100-f4741c68-3769-42bc-9542-bc72a312b603.png)
-![Updated Version](https://github.com/Mostafa-wael/Clean-My-Linux/assets/56788883/6dc556cc-afe0-483d-b003-cdd00781d55d)
+## Install
 
+```bash
+git clone https://github.com/Mostafa-wael/Clean-My-Linux.git
+cd Clean-My-Linux
+sudo install -m 755 clean /usr/local/bin/clean
+```
 
-The script does the following: 
-- Clean all the log files.
-- Clean systemd journal logs.
-- Clean the thumbnail cache.
-- Free up space by cleaning out the cached packages.
-- Getting rid of partial packages.
-- Getting rid of no longer required packages.
-- Remove Any Automatic Dependencies that are No Longer Needed with all of the associated configuration files from the dependencies.
-- Getting rid of orphaned packages.
-- Remove the Trash.
-- Remove Man.
-- Delete all .gz and rotated file.
-- Cleaning the old kernels.
-- Removes old revisions of snaps(leaves only 2 versions).
+## Usage
+
+```bash
+sudo clean          # every user under /home, plus the system
+clean               # only you, plus the system (asks for sudo)
+clean --dry-run     # show what would go, delete nothing
+clean --status      # disk, memory and pressure, no cleaning
+clean --deep        # also clear the slow-to-rebuild stuff (see below)
+```
+
+Try `clean --dry-run` first so you know what it's about to touch.
+
+## What gets cleaned
+
+Per user:
+
+- browser caches (Chrome, Chromium, Brave), npm and `npx` caches, `pnpm store prune`, uv, pip, Go build caches, TypeScript, Helm, Playwright and Puppeteer browsers, thumbnails, the Mesa shader cache, VS Code and Cursor cache folders, and the Trash
+- extension folders VS Code and Cursor leave behind after updates
+- old versions of CLI tools that keep a `versions` folder in `~/.local/share` (the one you're using stays)
+- `.zs-old` and `.AppImage.old` backups in `~/Applications`
+
+Docker: unused images and build cache. Volumes stay, they have your data in them.
+
+System, with sudo:
+
+- `apt autoclean`, `apt clean` and `apt autoremove --purge`
+- config files left over from packages you already uninstalled
+- journal logs older than 7 days
+- rotated logs in `/var/log` (`.gz`, `.1`, `.old`), never the live ones
+- disabled snap revisions, and it sets snap to keep only 2 from now on
+
+Only with `--deep`:
+
+- the Go module cache (`go clean -modcache`)
+- pre-commit hook environments
+- the agent cache in Cursor's `state.vscdb`, which can quietly grow to several GB. Chat history isn't touched. Cursor has to be closed. The file gets backed up first and restored if anything goes wrong.
+
+## What it won't touch
+
+`~/.cache/aws` (your AWS SSO login lives there), Docker volumes, live log files, man pages, and any package that's still installed.
+
+## Requirements
+
+Ubuntu or Debian with `bash`, `apt` and `python3`. snap, docker, pnpm, go and sqlite3 are optional; whatever isn't installed gets skipped.
 
 Enjoy the free space!
